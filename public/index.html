@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Photo Organizer</title>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Setup Phase -->
+        <div id="setup-screen" class="screen">
+            <div class="header-title">
+                <i data-lucide="image" class="title-icon"></i>
+                <h1>Photo Organizer</h1>
+            </div>
+            
+            <div class="setup-container">
+                <!-- Source Folder Selection -->
+                <div class="section">
+                    <div class="section-header">
+                        <div class="step-badge">1</div>
+                        <h2>Pilih Folder Sumber</h2>
+                    </div>
+                    <p class="hint">Folder yang berisi foto-foto yang akan disortir</p>
+                    
+                    <!-- MTP Device Selection -->
+                    <div class="mtp-section">
+                        <button onclick="loadMTPDevices()" class="js-btn mtp-btn">
+                            <i data-lucide="smartphone"></i>
+                            Deteksi Perangkat MTP
+                        </button>
+                        <div id="mtp-devices" class="mtp-devices hidden"></div>
+                        <div class="mtp-manual">
+                            <p class="manual-hint">Atau masukkan path MTP manual:</p>
+                            <div class="folder-input">
+                                <i data-lucide="folder-search" class="input-icon"></i>
+                                <input type="text" id="mtp-manual-path" placeholder="Contoh: /run/user/1000/gvfs/mtp:host=...">
+                                <button onclick="selectManualMTPPath()" class="js-btn primary-btn">Gunakan Path</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="folder-input main-input">
+                        <i data-lucide="folder-input" class="input-icon"></i>
+                        <input type="text" id="source-path" placeholder="Pilih folder sumber..." readonly>
+                        <button onclick="openFolderBrowser('source')" class="js-btn primary-btn">Pilih Folder</button>
+                    </div>
+                    <div id="source-info" class="folder-info"></div>
+                </div>
+
+                <!-- Destination Folders -->
+                <div class="section">
+                    <div class="section-header">
+                        <div class="step-badge">2</div>
+                        <h2>Tambahkan Folder Tujuan</h2>
+                    </div>
+                    <p class="hint">Folder tempat foto akan dipindahkan (min. 1, maks. 9)</p>
+                    <div id="destination-list" class="destination-list"></div>
+                    <button id="add-destination-btn" onclick="openFolderBrowser('destination')" class="js-btn add-btn">
+                        <i data-lucide="folder-plus"></i> Tambah Folder
+                    </button>
+                </div>
+
+                <!-- Start Button -->
+                <div class="section center pt-4">
+                    <button id="start-btn" onclick="startSorting()" class="js-btn start-btn" disabled>
+                        Mulai Sortir <i data-lucide="arrow-right"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sorting Phase -->
+        <div id="sorting-screen" class="screen hidden">
+            <div class="sorting-header">
+                <div class="sorting-title">
+                    <i data-lucide="images"></i>
+                    <h2>Sortir Foto</h2>
+                </div>
+                <div class="progress">
+                    <span id="progress-text">0 / 0</span>
+                    <div class="progress-bar">
+                        <div id="progress-fill" class="progress-fill"></div>
+                    </div>
+                </div>
+                <button onclick="stopSorting()" class="js-btn stop-btn">
+                    <i data-lucide="square"></i> Berhenti
+                </button>
+            </div>
+
+            <div class="sorting-content">
+                <div class="image-container">
+                    <img id="current-image" src="" alt="Current photo">
+                    <div class="image-name-badge">
+                        <i data-lucide="file-image"></i>
+                        <p id="image-name" class="image-name"></p>
+                    </div>
+                </div>
+
+                <div class="destination-buttons" id="destination-buttons"></div>
+
+                <div class="controls-hint">
+                    <div class="hint-item">
+                        <span class="key-hint">1-9</span>
+                        <p>Pindah ke folder tujuan</p>
+                    </div>
+                    <div class="hint-item">
+                        <span class="key-hint">S</span>
+                        <p>Lewati foto ini</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Completion Screen -->
+        <div id="complete-screen" class="screen hidden">
+            <div class="complete-container">
+                <div class="complete-icon">
+                    <i data-lucide="check-circle-2"></i>
+                </div>
+                <h1>Selesai!</h1>
+                <div id="stats" class="stats"></div>
+                <button onclick="restart()" class="js-btn restart-btn">
+                    <i data-lucide="rotate-ccw"></i> Sortir Lagi
+                </button>
+            </div>
+        </div>
+
+        <!-- Folder Browser Modal -->
+        <div id="folder-modal" class="modal hidden">
+            <div class="modal-overlay" onclick="closeFolderBrowser()"></div>
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Pilih Folder</h3>
+                    <button onclick="closeFolderBrowser()" class="close-btn"><i data-lucide="x"></i></button>
+                </div>
+                <div class="modal-nav">
+                    <div class="path-input-wrapper">
+                        <i data-lucide="search" class="input-icon"></i>
+                        <input type="text" id="path-input" placeholder="Masukkan path..." onkeypress="handlePathInput(event)">
+                    </div>
+                    <button onclick="goToPath()" class="js-btn icon-btn"><i data-lucide="arrow-right"></i></button>
+                    <button onclick="goUp()" class="js-btn up-btn"><i data-lucide="corner-left-up"></i> Naik</button>
+                </div>
+                <div class="current-path" id="current-path-display"></div>
+                <div id="folder-list" class="folder-list"></div>
+                <div class="modal-footer">
+                    <button onclick="selectCurrentFolder()" class="js-btn select-btn">
+                        <i data-lucide="check"></i> Pilih Folder Ini
+                    </button>
+                    <button onclick="closeFolderBrowser()" class="js-btn cancel-btn">Batal</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+    </script>
+</body>
+</html>

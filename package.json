@@ -1,0 +1,12 @@
+{
+  "name": "photo-organizer",
+  "version": "1.0.0",
+  "description": "Aplikasi untuk mengorganisir foto ke folder tujuan",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}
