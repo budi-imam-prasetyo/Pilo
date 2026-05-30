@@ -10,9 +10,47 @@ const PORT = 3000;
 
 app.use(express.json());
 app.use(express.static('public'));
+app.use('/vendor/pdfjs', express.static(path.join(__dirname, 'node_modules/pdfjs-dist/legacy/build')));
 
-// Supported image extensions
+// Supported extensions by type
 const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg', '.tiff', '.ico'];
+const PDF_EXTENSIONS = ['.pdf'];
+const VIDEO_EXTENSIONS = ['.mp4', '.webm', '.mkv', '.mov', '.avi'];
+const AUDIO_EXTENSIONS = ['.mp3', '.wav', '.ogg', '.flac', '.m4a', '.aac'];
+const TEXT_EXTENSIONS = ['.txt', '.md', '.log', '.csv', '.json', '.yaml', '.yml'];
+const CODE_EXTENSIONS = [
+    '.js', '.ts', '.jsx', '.tsx', '.py', '.java', '.c', '.cpp', '.h', '.hpp',
+    '.cs', '.go', '.rs', '.php', '.rb', '.sh', '.bat', '.ps1', '.html', '.css',
+    '.scss', '.less', '.xml', '.ini', '.toml'
+];
+const ZIP_EXTENSIONS = ['.zip'];
+const DOCX_EXTENSIONS = ['.docx'];
+const XLSX_EXTENSIONS = ['.xlsx', '.xls'];
+
+const SUPPORTED_EXTENSIONS = new Set([
+    ...IMAGE_EXTENSIONS,
+    ...PDF_EXTENSIONS,
+    ...VIDEO_EXTENSIONS,
+    ...AUDIO_EXTENSIONS,
+    ...TEXT_EXTENSIONS,
+    ...CODE_EXTENSIONS,
+    ...ZIP_EXTENSIONS,
+    ...DOCX_EXTENSIONS,
+    ...XLSX_EXTENSIONS
+]);
+
+function getFileType(ext) {
+    if (IMAGE_EXTENSIONS.includes(ext)) return 'image';
+    if (PDF_EXTENSIONS.includes(ext)) return 'pdf';
+    if (VIDEO_EXTENSIONS.includes(ext)) return 'video';
+    if (AUDIO_EXTENSIONS.includes(ext)) return 'audio';
+    if (TEXT_EXTENSIONS.includes(ext)) return 'text';
+    if (CODE_EXTENSIONS.includes(ext)) return 'code';
+    if (ZIP_EXTENSIONS.includes(ext)) return 'zip';
+    if (DOCX_EXTENSIONS.includes(ext)) return 'docx';
+    if (XLSX_EXTENSIONS.includes(ext)) return 'xlsx';
+    return 'unknown';
+}
 
 // API: Detect MTP devices
 app.get('/api/mtp-devices', async (req, res) => {
@@ -331,6 +369,125 @@ app.get('/api/images', async (req, res) => {
     }
 });
 
+// API: Get files from a folder (including KIO paths)
+app.get('/api/files', async (req, res) => {
+    const dirPath = req.query.path;
+
+    if (!dirPath) {
+        return res.json({ success: false, error: 'Path diperlukan' });
+    }
+
+    // Check if this is a KIO path
+    if (dirPath.startsWith('mtp:/')) {
+        try {
+            const kioCmd = `kioclient5 ls "${dirPath}" 2>/dev/null || kioclient ls "${dirPath}" 2>/dev/null || echo ""`;
+            const { stdout } = await execAsync(kioCmd);
+            const files = stdout.trim().split('\n').filter(item => item && item !== '.');
+
+            const items = files.map(file => {
+                const ext = path.extname(file).toLowerCase();
+                return {
+                    name: file,
+                    path: path.posix.join(dirPath, file),
+                    ext,
+                    type: getFileType(ext),
+                    isKio: true
+                };
+            }).filter(item => SUPPORTED_EXTENSIONS.has(item.ext));
+
+            items.sort((a, b) => a.name.localeCompare(b.name));
+
+            return res.json({
+                success: true,
+                files: items,
+                total: items.length,
+                isKioPath: true
+            });
+        } catch (error) {
+            return res.json({ success: false, error: error.message });
+        }
+    }
+
+    // Normal filesystem path
+    try {
+        if (!fs.existsSync(dirPath)) {
+            return res.json({ success: false, error: 'Folder tidak ditemukan' });
+        }
+
+        const files = fs.readdirSync(dirPath);
+        const items = files.map(file => {
+            const ext = path.extname(file).toLowerCase();
+            return {
+                name: file,
+                path: path.join(dirPath, file),
+                ext,
+                type: getFileType(ext)
+            };
+        }).filter(item => SUPPORTED_EXTENSIONS.has(item.ext));
+
+        items.sort((a, b) => a.name.localeCompare(b.name));
+
+        res.json({
+            success: true,
+            files: items,
+            total: items.length
+        });
+    } catch (error) {
+        res.json({ success: false, error: error.message });
+    }
+});
+
+// API: Serve file (including KIO paths)
+app.get('/api/file', async (req, res) => {
+    const filePath = req.query.path;
+
+    if (!filePath) {
+        return res.status(400).send('Path diperlukan');
+    }
+
+    // Check if this is a KIO path
+    if (filePath.startsWith('mtp:/')) {
+        try {
+            const tmpDir = '/tmp/photo-organizer-mtp';
+            if (!fs.existsSync(tmpDir)) {
+                fs.mkdirSync(tmpDir, { recursive: true });
+            }
+
+            const fileName = path.basename(filePath);
+            const tmpFile = path.join(tmpDir, `${Date.now()}_${fileName}`);
+
+            const copyCmd = `kioclient5 copy "${filePath}" "${tmpFile}" 2>/dev/null || kioclient copy "${filePath}" "${tmpFile}" 2>/dev/null`;
+            await execAsync(copyCmd);
+
+            const mimeType = require('mime-types').lookup(fileName) || 'application/octet-stream';
+            res.type(mimeType);
+            res.sendFile(tmpFile, () => {
+                try {
+                    fs.unlinkSync(tmpFile);
+                } catch (e) {
+                    console.log('Failed to delete temp file:', e.message);
+                }
+            });
+        } catch (error) {
+            return res.status(500).send(error.message);
+        }
+        return;
+    }
+
+    // Normal filesystem path
+    try {
+        if (!fs.existsSync(filePath)) {
+            return res.status(404).send('File tidak ditemukan');
+        }
+
+        const mimeType = require('mime-types').lookup(filePath) || 'application/octet-stream';
+        res.type(mimeType);
+        res.sendFile(filePath);
+    } catch (error) {
+        res.status(500).send(error.message);
+    }
+});
+
 // API: Serve image file (including KIO paths)
 app.get('/api/image', async (req, res) => {
     const imagePath = req.query.path;
@@ -473,11 +630,11 @@ app.post('/api/skip', (req, res) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`\n🖼️  Photo Organizer berjalan di http://localhost:${PORT}`);
+    console.log(`\n📂  File Organizer berjalan di http://localhost:${PORT}`);
     console.log('\nCara penggunaan:');
-    console.log('1. Pilih folder sumber yang berisi foto');
+    console.log('1. Pilih folder sumber yang berisi file');
     console.log('2. Tambahkan folder-folder tujuan');
     console.log('3. Klik "Mulai Sortir" untuk memulai');
-    console.log('4. Tekan angka 1-9 untuk memindahkan foto ke folder tujuan');
-    console.log('5. Tekan S untuk melewati foto\n');
+    console.log('4. Tekan angka 1-9 untuk memindahkan file ke folder tujuan');
+    console.log('5. Tekan S untuk melewati file\n');
 });

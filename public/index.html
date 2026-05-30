@@ -3,13 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Photo Organizer</title>
-    <!-- Google Fonts: Inter -->
+    <title>File Organizer</title>
+    <!-- Google Fonts: Cormorant Garamond, Inter, JetBrains Mono -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="https://unpkg.com/photoswipe@5.4.4/dist/photoswipe.css">
+    <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -18,7 +20,7 @@
         <div id="setup-screen" class="screen">
             <div class="header-title">
                 <i data-lucide="image" class="title-icon"></i>
-                <h1>Photo Organizer</h1>
+                <h1>File Organizer</h1>
             </div>
             
             <div class="setup-container">
@@ -28,7 +30,7 @@
                         <div class="step-badge">1</div>
                         <h2>Pilih Folder Sumber</h2>
                     </div>
-                    <p class="hint">Folder yang berisi foto-foto yang akan disortir</p>
+                    <p class="hint">Folder yang berisi file yang akan disortir</p>
                     
                     <!-- MTP Device Selection -->
                     <div class="mtp-section">
@@ -61,7 +63,7 @@
                         <div class="step-badge">2</div>
                         <h2>Tambahkan Folder Tujuan</h2>
                     </div>
-                    <p class="hint">Folder tempat foto akan dipindahkan (min. 1, maks. 9)</p>
+                    <p class="hint">Folder tempat file akan dipindahkan (min. 1, maks. 9)</p>
                     <div id="destination-list" class="destination-list"></div>
                     <button id="add-destination-btn" onclick="openFolderBrowser('destination')" class="js-btn add-btn">
                         <i data-lucide="folder-plus"></i> Tambah Folder
@@ -82,7 +84,7 @@
             <div class="sorting-header">
                 <div class="sorting-title">
                     <i data-lucide="images"></i>
-                    <h2>Sortir Foto</h2>
+                    <h2>Sortir File</h2>
                 </div>
                 <div class="progress">
                     <span id="progress-text">0 / 0</span>
@@ -96,10 +98,44 @@
             </div>
 
             <div class="sorting-content">
-                <div class="image-container">
-                    <img id="current-image" src="" alt="Current photo">
+                <div class="viewer-container">
+                    <div id="image-viewer" class="viewer hidden">
+                        <a id="photo-link" href="" target="_blank" rel="noreferrer">
+                            <img id="current-image" src="" alt="Current file">
+                        </a>
+                    </div>
+                    <div id="pdf-viewer" class="viewer hidden">
+                        <div class="pdf-controls">
+                            <button id="pdf-prev" class="js-btn icon-btn">Prev</button>
+                            <span id="pdf-page-info">- / -</span>
+                            <button id="pdf-next" class="js-btn icon-btn">Next</button>
+                        </div>
+                        <canvas id="pdf-canvas"></canvas>
+                    </div>
+                    <div id="video-viewer" class="viewer hidden">
+                        <video id="video-player" controls></video>
+                    </div>
+                    <div id="audio-viewer" class="viewer hidden">
+                        <audio id="audio-player" controls></audio>
+                    </div>
+                    <div id="text-viewer" class="viewer hidden">
+                        <div id="monaco-editor" class="monaco-editor"></div>
+                    </div>
+                    <div id="zip-viewer" class="viewer hidden">
+                        <div id="zip-list" class="text-panel"></div>
+                    </div>
+                    <div id="docx-viewer" class="viewer hidden">
+                        <div id="docx-content" class="text-panel"></div>
+                    </div>
+                    <div id="xlsx-viewer" class="viewer hidden">
+                        <div id="xlsx-content" class="text-panel"></div>
+                    </div>
+                    <div id="unsupported-viewer" class="viewer hidden">
+                        <p id="unsupported-text" class="text-panel">Tipe file ini belum didukung.</p>
+                    </div>
+
                     <div class="image-name-badge">
-                        <i data-lucide="file-image"></i>
+                        <i data-lucide="file"></i>
                         <p id="image-name" class="image-name"></p>
                     </div>
                 </div>
@@ -113,7 +149,7 @@
                     </div>
                     <div class="hint-item">
                         <span class="key-hint">S</span>
-                        <p>Lewati foto ini</p>
+                        <p>Lewati file ini</p>
                     </div>
                 </div>
             </div>
@@ -147,7 +183,6 @@
                         <input type="text" id="path-input" placeholder="Masukkan path..." onkeypress="handlePathInput(event)">
                     </div>
                     <button onclick="goToPath()" class="js-btn icon-btn"><i data-lucide="arrow-right"></i></button>
-                    <button onclick="goUp()" class="js-btn up-btn"><i data-lucide="corner-left-up"></i> Naik</button>
                 </div>
                 <div class="current-path" id="current-path-display"></div>
                 <div id="folder-list" class="folder-list"></div>
@@ -161,6 +196,18 @@
         </div>
     </div>
 
+    <script type="module">
+        import * as pdfjsLib from '/vendor/pdfjs/pdf.mjs';
+        pdfjsLib.GlobalWorkerOptions.workerSrc = '/vendor/pdfjs/pdf.worker.mjs';
+        window.pdfjsLib = pdfjsLib;
+    </script>
+    <script src="https://unpkg.com/photoswipe@5.4.4/dist/photoswipe.umd.min.js"></script>
+    <script src="https://unpkg.com/photoswipe@5.4.4/dist/photoswipe-lightbox.umd.min.js"></script>
+    <script src="https://cdn.plyr.io/3.7.8/plyr.polyfilled.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mammoth@1.10.0/mammoth.browser.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://unpkg.com/monaco-editor@0.50.0/min/vs/loader.js"></script>
     <script src="app.js"></script>
     <script>
         // Initialize Lucide icons

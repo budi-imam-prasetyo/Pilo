@@ -1,24 +1,25 @@
 ---
 
-# 🖼️ Photo Organizer
+# Photo Organizer
 
-Aplikasi web lokal untuk menyortir foto dengan cepat menggunakan keyboard.
-
----
-
-## ✨ Fitur
-
-* Shortcut `1–9` untuk pindah foto
-* `S` untuk skip
-* Support perangkat MTP (Android/Kamera)
-* UI modern (dark + glassmorphism)
-* 100% lokal (tidak upload ke internet)
+Aplikasi web lokal untuk menyortir file (foto, dokumen, media) dengan cepat menggunakan keyboard. Semua proses berjalan lokal di mesin Anda.
 
 ---
 
-## 🚀 Jalankan
+## Fitur
 
-### Opsi 1 — Node.js
+- Shortcut `1-9` untuk pindah file ke folder tujuan
+- `S` untuk skip
+- Support perangkat MTP (Android/Kamera)
+- Viewer built-in: gambar, PDF, video, audio, teks/kode, ZIP, DOCX, XLSX
+- UI editorial cream + coral (tanpa mode gelap/glassmorphism)
+- 100% lokal (tidak upload ke internet)
+
+---
+
+## Jalankan
+
+### Opsi 1 - Node.js
 
 Install:
 
@@ -32,9 +33,15 @@ Run:
 npm start
 ```
 
+Mode dev (auto-reload):
+
+```bash
+npm run dev
+```
+
 ---
 
-### Opsi 2 — Bun
+### Opsi 2 - Bun
 
 Install:
 
@@ -45,22 +52,29 @@ bun install
 Run:
 
 ```bash
-bun server.js
+bun run dev
 ```
 
 ---
 
-## 🌐 Akses
+## Akses
 
-[http://localhost:3000](http://localhost:3000)
+http://localhost:3000
 
 ---
 
-## 🎮 Cara Pakai
+## Cara Pakai
 
 1. Pilih folder sumber
 2. Tambahkan folder tujuan
 3. Klik mulai
-4. Tekan `1–9` untuk pindah, `S` untuk skip
+4. Tekan `1-9` untuk pindah, `S` untuk skip
+
+---
+
+## Catatan
+
+- PDF dirender via PDF.js lokal (tanpa CDN)
+- Jika MTP tidak terdeteksi, pastikan perangkat sudah dalam mode transfer file
 
 ---
